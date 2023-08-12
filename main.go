@@ -5,87 +5,118 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
+	"strings"
 )
-
-type Post struct {
-	Id       int       `json:"id"`
-	Upvotes  int       `json:"upvotes"`
-	Title    string    `json:"title"`
-	Link     string    `json:"link"`
-	Username string    `json:"username"`
-	Comments []Comment `json:"comments"`
-}
-
-type Comment struct {
-	Id       int    `json:"id"`
-	Upvotes  int    `json:"upvotes"`
-	Text     string `json:"text"`
-	Username string `json:"username"`
-}
-
-var db = []Post{
-	{
-		Id:       1,
-		Upvotes:  1,
-		Title:    "My cat is the cutest!",
-		Link:     "https://i.imgur.com/jseZqNK.jpg",
-		Username: "alicia98",
-		Comments: []Comment{
-			{
-				Id:       1,
-				Upvotes:  2,
-				Text:     "She's such a cutie! :3",
-				Username: "raahi014",
-			},
-		},
-	},
-	{
-		Id:       2,
-		Upvotes:  -432,
-		Title:    "Thomas Jefferson circa 2015",
-		Link:     "https://i.redd.it/xn9auq3xdoa51.jpg",
-		Username: "ZzturtleszZ",
-		Comments: []Comment{},
-	},
-}
 
 func main() {
 
 	router := http.NewServeMux()
 
-	router.HandleFunc("/api/posts", handlePosts)
+	router.Handle(
+		"/api/posts/",
+		http.StripPrefix("/api/posts/", http.HandlerFunc(handlePost)),
+	)
 
 	fmt.Println("Server running on http://localhost:8080...")
 	log.Fatal(http.ListenAndServe(":8080", router))
 }
 
-func handlePosts(w http.ResponseWriter, r *http.Request) {
-	if http.MethodGet == r.Method {
-        fmt.Println(http.MethodGet, r.Method)
-		w.Header().Add("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string][]Post{"posts": db})
-	} else if http.MethodPost == r.Method {
-        var p Post
-        err := json.NewDecoder(r.Body).Decode(&p)
+func handlePost(w http.ResponseWriter, r *http.Request) {
+	var post Post
+	var posts []Post
 
-        if err != nil {
+	switch r.Method {
+	case http.MethodGet:
+        if r.URL.Path == "" {
             w.Header().Add("Content-Type", "application/json")
-            w.WriteHeader(http.StatusBadRequest)
-            json.NewEncoder(w).Encode(map[string]string{"error": "Couldn't add post"})
+            w.WriteHeader(http.StatusOK)
+            json.NewEncoder(w).Encode(map[string][]Post{"posts": db})
             return
         }
 
-        p.Id = len(db) + 1
-        p.Upvotes = 1
-        p.Comments = []Comment{}
-        db = append(db, p)
         
-        w.Header().Add("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-        json.NewEncoder(w).Encode(p)
+		id, err := strconv.Atoi(r.URL.Path)
 
-    } else {
-        http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-    }
+		if err != nil {
+			w.Header().Add("Content-Type", "application/json")
+			w.WriteHeader(http.StatusNotFound)
+			json.NewEncoder(w).Encode(map[string]string{"error": "post not found."})
+			return
+		} 
+        
+		for i := range db {
+			if db[i].Id == id {
+				w.Header().Add("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				json.NewEncoder(w).Encode(db[i])
+				return
+			}
+		}
+
+		w.Header().Add("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "post not found."})
+	case http.MethodDelete:
+		id, err := strconv.Atoi(r.URL.Path)
+
+		if err != nil {
+			w.Header().Add("Content-Type", "application/json")
+			w.WriteHeader(http.StatusNotFound)
+			json.NewEncoder(w).Encode(map[string]string{"error": "post not found."})
+			return
+		}
+
+		for i := range db {
+			if db[i].Id != id {
+				posts = append(posts, db[i])
+			} else {
+				post = db[i]
+			}
+		}
+
+		if post.Id != 0 {
+			db = posts
+			w.Header().Add("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(post)
+			return
+		}
+
+		w.Header().Add("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "can't delete post"})
+	case http.MethodPost:
+		var p Post
+
+		if !strings.Contains(r.Header.Get("Content-Type"), "application/json") {
+			http.Error(w, "'Content-Type' header is not 'application/json'", http.StatusUnsupportedMediaType)
+			return
+		}
+
+		r.Body = http.MaxBytesReader(w, r.Body, 1048576)
+
+		dec := json.NewDecoder(r.Body)
+		dec.DisallowUnknownFields()
+		err := dec.Decode(&p)
+
+		if err != nil {
+			w.Header().Add("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": "couldn't add post"})
+			return
+		}
+
+		p.Id = db[len(db)-1].Id + 1
+		p.Upvotes = 1
+		p.Comments = []Comment{}
+		db = append(db, p)
+
+		w.Header().Add("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(p)
+	default:
+		w.Header().Set("Allow", "GET, POST, DELETE")
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
 }
