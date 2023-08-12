@@ -15,14 +15,14 @@ func main() {
 
 	router.Handle(
 		"/api/posts/",
-		http.StripPrefix("/api/posts/", http.HandlerFunc(handlePost)),
+		http.StripPrefix("/api/posts/", http.HandlerFunc(handlePosts)),
 	)
 
 	fmt.Println("Server running on http://localhost:8080...")
 	log.Fatal(http.ListenAndServe(":8080", router))
 }
 
-func handlePost(w http.ResponseWriter, r *http.Request) {
+func handlePosts(w http.ResponseWriter, r *http.Request) {
 	var post Post
 	var posts []Post
 
