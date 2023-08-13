@@ -10,35 +10,38 @@ import (
 func handlePosts(w http.ResponseWriter, r *http.Request) {
 	var post Post
 	var posts []Post
+	var comments []Comment
 
 	switch r.Method {
 	case http.MethodGet:
 		if r.URL.Path == "" {
 			w.Header().Add("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(map[string][]Post{"posts": db})
+			json.NewEncoder(w).Encode(map[string][]Post{"posts": db.Posts})
 			return
 		}
 
-        if strings.Contains(r.URL.Path, "comments") {
-            id, err := strconv.Atoi(r.URL.Path[:strings.Index(r.URL.Path, "/")])
+		if strings.Contains(r.URL.Path, "comments") {
+			id, err := strconv.Atoi(r.URL.Path[:strings.Index(r.URL.Path, "/")])
 
-            if err != nil {
-                w.Header().Add("Content-Type", "application/json")
-                w.WriteHeader(http.StatusNotFound)
-                json.NewEncoder(w).Encode(map[string]string{"error": "comments not found"})
-                return
-            }
+			if err != nil {
+				w.Header().Add("Content-Type", "application/json")
+				w.WriteHeader(http.StatusNotFound)
+				json.NewEncoder(w).Encode(map[string]string{"error": "comments not found"})
+				return
+			}
 
-            for i := range db {
-                if db[i].Id == id {
-                    w.Header().Add("Content-Type", "application/json")
-                    w.WriteHeader(http.StatusOK)
-                    json.NewEncoder(w).Encode(map[string][]Comment{"comments": db[i].Comments})
-                    return
-                }
-            }
-        }
+			for i := range db.Comments {
+				if db.Comments[i].PostId == id {
+					comments = append(comments, db.Comments[i])
+				}
+			}
+
+			w.Header().Add("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(map[string][]Comment{"comments": comments})
+			return
+		}
 
 		id, err := strconv.Atoi(r.URL.Path)
 
@@ -49,11 +52,11 @@ func handlePosts(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		for i := range db {
-			if db[i].Id == id {
+		for i := range db.Posts {
+			if db.Posts[i].Id == id {
 				w.Header().Add("Content-Type", "application/json")
 				w.WriteHeader(http.StatusOK)
-				json.NewEncoder(w).Encode(db[i])
+				json.NewEncoder(w).Encode(db.Posts[i])
 				return
 			}
 		}
@@ -71,16 +74,16 @@ func handlePosts(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		for i := range db {
-			if db[i].Id != id {
-				posts = append(posts, db[i])
+		for i := range db.Posts {
+			if db.Posts[i].Id != id {
+				posts = append(posts, db.Posts[i])
 			} else {
-				post = db[i]
+				post = db.Posts[i]
 			}
 		}
 
 		if post.Id != 0 {
-			db = posts
+			db.Posts = posts
 			w.Header().Add("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			json.NewEncoder(w).Encode(post)
@@ -111,46 +114,15 @@ func handlePosts(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		p.Id = db[len(db)-1].Id + 1
+		p.Id = db.Posts[len(db.Posts)-1].Id + 1
 		p.Upvotes = 1
-		p.Comments = []Comment{}
-		db = append(db, p)
+		db.Posts = append(db.Posts, p)
 
 		w.Header().Add("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(p)
 	default:
 		w.Header().Set("Allow", "GET, POST, DELETE")
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-	}
-}
-
-func handleComments(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodGet:
-		id, err := strconv.Atoi(r.URL.Path)
-
-		if err != nil {
-			w.Header().Add("Content-Type", "application/json")
-			w.WriteHeader(http.StatusNotFound)
-			json.NewEncoder(w).Encode(map[string]string{"error": "comments for post not found"})
-			return
-		}
-
-		for i := range db {
-			if db[i].Id == id && len(db[i].Comments) > 1 {
-                w.Header().Add("Content-Type", "application/json")
-                w.WriteHeader(http.StatusOK)
-                json.NewEncoder(w).Encode(map[string][]Comment{"comments": db[i].Comments})
-                return
-			}
-		}
-        
-        w.Header().Add("Content-Type", "application/json")
-        w.WriteHeader(http.StatusNotFound)
-        json.NewEncoder(w).Encode(map[string]string{"error": "post not found"})
-	default:
-		w.Header().Set("Allow", "GET")
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
 }
