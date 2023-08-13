@@ -95,14 +95,50 @@ func handlePosts(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]string{"error": "can't delete post"})
 	case http.MethodPost:
 		var p Post
-        var c Comment
+		var c Comment
 
 		if !strings.Contains(r.Header.Get("Content-Type"), "application/json") {
 			http.Error(w, "'Content-Type' header is not 'application/json'", http.StatusUnsupportedMediaType)
 			return
 		}
 
-		if strings.Contains(r.URL.Path, "comments") {
+		if strings.Contains(r.URL.Path, "comments/") {
+			id, err := strconv.Atoi(r.URL.Path[strings.LastIndexAny(r.URL.Path, "/") + 1:])
+
+			if err != nil {
+				w.Header().Add("Content-Type", "application/json")
+				w.WriteHeader(http.StatusNotFound)
+				json.NewEncoder(w).Encode(map[string]string{"error": "comment not found"})
+				return
+			}
+
+			r.Body = http.MaxBytesReader(w, r.Body, 1048576)
+
+			for i := range db.Comments {
+				if db.Comments[i].Id == id {
+					c = db.Comments[i]
+				}
+			}
+
+			dec := json.NewDecoder(r.Body)
+			dec.DisallowUnknownFields()
+			err = dec.Decode(&c)
+
+			if err != nil {
+				w.Header().Add("Content-Type", "application/json")
+				w.WriteHeader(http.StatusBadRequest)
+				json.NewEncoder(w).Encode(map[string]string{"error": "couldn't edit comment"})
+				return
+			}
+            
+            db.Comments[id - 1] = c
+			w.Header().Add("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(c)
+			return
+		}
+
+		if strings.Contains(r.URL.Path, "/comments") {
 			id, err := strconv.Atoi(r.URL.Path[:strings.Index(r.URL.Path, "/")])
 
 			if err != nil {
@@ -112,28 +148,28 @@ func handlePosts(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-            r.Body = http.MaxBytesReader(w, r.Body, 1048576)
+			r.Body = http.MaxBytesReader(w, r.Body, 1048576)
 
-            dec := json.NewDecoder(r.Body)
-            dec.DisallowUnknownFields()
-            err = dec.Decode(&c)
+			dec := json.NewDecoder(r.Body)
+			dec.DisallowUnknownFields()
+			err = dec.Decode(&c)
 
-            if err != nil {
-                w.Header().Add("Content-Type", "application/json")
-                w.WriteHeader(http.StatusBadRequest)
-                json.NewEncoder(w).Encode(map[string]string{"error": "couldn't add post"})
-                return
-            }
+			if err != nil {
+				w.Header().Add("Content-Type", "application/json")
+				w.WriteHeader(http.StatusBadRequest)
+				json.NewEncoder(w).Encode(map[string]string{"error": "couldn't add post"})
+				return
+			}
 
-            c.Id = db.Comments[len(db.Comments)-1].Id + 1
-            c.PostId = id
-            c.Upvotes = 1
-            db.Comments = append(db.Comments, c)
+			c.Id = db.Comments[len(db.Comments)-1].Id + 1
+			c.PostId = id
+			c.Upvotes = 1
+			db.Comments = append(db.Comments, c)
 
-            w.Header().Add("Content-Type", "application/json")
-            w.WriteHeader(http.StatusCreated)
-            json.NewEncoder(w).Encode(c)
-            return
+			w.Header().Add("Content-Type", "application/json")
+			w.WriteHeader(http.StatusCreated)
+			json.NewEncoder(w).Encode(c)
+			return
 		}
 
 		r.Body = http.MaxBytesReader(w, r.Body, 1048576)
