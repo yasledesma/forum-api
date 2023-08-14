@@ -37,9 +37,16 @@ func handlePosts(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 
+			if comments != nil {
+				w.Header().Add("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				json.NewEncoder(w).Encode(map[string][]Comment{"comments": comments})
+				return
+			}
+
 			w.Header().Add("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(map[string][]Comment{"comments": comments})
+			w.WriteHeader(http.StatusNotFound)
+			json.NewEncoder(w).Encode(map[string]string{"error": "comments not found"})
 			return
 		}
 
@@ -65,6 +72,8 @@ func handlePosts(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		json.NewEncoder(w).Encode(map[string]string{"error": "post not found"})
 	case http.MethodDelete:
+		var comments []Comment
+
 		id, err := strconv.Atoi(r.URL.Path)
 
 		if err != nil {
@@ -82,8 +91,15 @@ func handlePosts(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
+		for i := range db.Comments {
+			if db.Comments[i].PostId != id {
+				comments = append(comments, db.Comments[i])
+			}
+		}
+
 		if post.Id != 0 {
 			db.Posts = posts
+			db.Comments = comments
 			w.Header().Add("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			json.NewEncoder(w).Encode(post)
@@ -103,7 +119,7 @@ func handlePosts(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if strings.Contains(r.URL.Path, "comments/") {
-			id, err := strconv.Atoi(r.URL.Path[strings.LastIndexAny(r.URL.Path, "/") + 1:])
+			id, err := strconv.Atoi(r.URL.Path[strings.LastIndexAny(r.URL.Path, "/")+1:])
 
 			if err != nil {
 				w.Header().Add("Content-Type", "application/json")
@@ -124,14 +140,14 @@ func handlePosts(w http.ResponseWriter, r *http.Request) {
 			dec.DisallowUnknownFields()
 			err = dec.Decode(&c)
 
-			if err != nil {
+			if err != nil || c.Id < 1 {
 				w.Header().Add("Content-Type", "application/json")
 				w.WriteHeader(http.StatusBadRequest)
 				json.NewEncoder(w).Encode(map[string]string{"error": "couldn't edit comment"})
 				return
 			}
-            
-            db.Comments[id - 1] = c
+
+			db.Comments[id-1] = c
 			w.Header().Add("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			json.NewEncoder(w).Encode(c)
@@ -161,7 +177,13 @@ func handlePosts(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			c.Id = db.Comments[len(db.Comments)-1].Id + 1
+			var index int = 1
+
+			if len(db.Comments) != 0 {
+				index = len(db.Comments) - 1
+			}
+
+			c.Id = db.Comments[index].Id + 1
 			c.PostId = id
 			c.Upvotes = 1
 			db.Comments = append(db.Comments, c)
