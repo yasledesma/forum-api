@@ -13,27 +13,40 @@ func TestGetAllPosts(t *testing.T) {
 		var p []Post
 		var posts = map[string][]Post{"posts": p}
 
-        // tests '/api/posts' route
+		// tests '/api/posts' route
 		request, _ := http.NewRequest(http.MethodGet, "", nil)
 		response := httptest.NewRecorder()
 
 		handlePosts(response, request)
 
 		err := json.NewDecoder(response.Body).Decode(&posts)
-
-		if err != nil {
-			t.Fatalf("unable to parse response from server: %q into slice %v", response.Body, err)
-		}
+		checkError(t, err)
 
 		got := posts["posts"]
 		want := db.Posts
-        
-		if response.Result().StatusCode != http.StatusOK {
-			t.Errorf("expected %v, got %v", http.StatusOK, response.Result().StatusCode)
-		}
 
-		if !reflect.DeepEqual(got, want) {
-			t.Errorf("got %v, want %v", got, want)
-		}
+		assertStatusCode(t, response, http.StatusOK)
+		assertResponse(t, got, want)
 	})
+}
+
+func assertResponse(t *testing.T, got, want []Post) {
+	t.Helper()
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
+func assertStatusCode(t *testing.T, response *httptest.ResponseRecorder, statusCode int) {
+	t.Helper()
+	if response.Result().StatusCode != statusCode {
+		t.Errorf("expected %v, got %v", http.StatusOK, response.Result().StatusCode)
+	}
+}
+
+func checkError(t *testing.T, err error) {
+	t.Helper()
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
 }
