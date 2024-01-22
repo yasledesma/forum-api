@@ -1,5 +1,8 @@
 BINARY_NAME=forum_api
 
+install: # Install third party packages
+	@go get ./...
+	
 build: # Build binary
 	@mkdir -p ./out/bin
 	@GO111MODULE=on go build -mod vendor -o ./out/bin/$(BINARY_NAME) .
