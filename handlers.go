@@ -9,6 +9,18 @@ import (
 	"github.com/julienschmidt/httprouter"
 )
 
+func deletePostComments(pid int) []Comment {
+    var comments []Comment
+    
+    for i := range db.Comments {
+        if db.Comments[i].PostId == pid {
+            comments = append(comments, db.Comments[i])
+        } 
+    }
+
+    return comments
+}
+
 func GetPosts(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	w.Header().Add("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -24,7 +36,6 @@ func AddPost(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	}
 
 	r.Body = http.MaxBytesReader(w, r.Body, 1048576)
-
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
 	err := dec.Decode(&p)
@@ -37,6 +48,8 @@ func AddPost(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	}
 
 	// TODO: this is business logic. move it to a service.
+	// check for empty field
+
 	p.Id = db.Posts[len(db.Posts)-1].Id + 1 // save as next index
 	p.Upvotes = 1
 	db.Posts = append(db.Posts, p)
@@ -88,6 +101,7 @@ func DeletePost(w http.ResponseWriter, r *http.Request, params httprouter.Params
 			posts = append(posts, db.Posts[i])
 		} else {
 			post = db.Posts[i]
+            db.Comments = deletePostComments(i)
 		}
 	}
 
@@ -135,73 +149,83 @@ func GetComments(w http.ResponseWriter, r *http.Request, params httprouter.Param
 }
 
 func AddComment(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-    var c Comment
+	var c Comment
 
-    id, err := strconv.Atoi(params.ByName("pid"))
+	id, err := strconv.Atoi(params.ByName("pid"))
 
-    if err != nil {
-        w.Header().Add("Content-Type", "application/json")
-        w.WriteHeader(http.StatusNotFound)
-        json.NewEncoder(w).Encode(map[string]string{"error": "post not found"})
-        return
+	if err != nil {
+		w.Header().Add("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "post not found"})
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, 1048576)
+
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	err = dec.Decode(&c)
+
+	var index int = 1
+
+	if len(db.Comments) == 0 {
+		index = 1
+	} else {
+        index = db.Comments[len(db.Comments) - 1].Id + 1 
     }
 
-    r.Body = http.MaxBytesReader(w, r.Body, 1048576)
+	c.Id = index
+	c.PostId = id
+	c.Upvotes = 1
+	db.Comments = append(db.Comments, c)
 
-    dec := json.NewDecoder(r.Body)
-    dec.DisallowUnknownFields()
-    err = dec.Decode(&c)
-
-    var index int = 1
-
-    if len(db.Comments) != 0 {
-        index = len(db.Comments) - 1
-    }
-
-    c.Id = db.Comments[index].Id + 1
-    c.PostId = id
-    c.Upvotes = 1
-    db.Comments = append(db.Comments, c)
-
-    w.Header().Add("Content-Type", "application/json")
-    w.WriteHeader(http.StatusCreated)
-    json.NewEncoder(w).Encode(c)
+	w.Header().Add("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(c)
 }
 
-
 func UpdateComment(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-    var c Comment
+	var c Comment
 
-    id, err := strconv.Atoi(params.ByName("cid"))
+	pid, err := strconv.Atoi(params.ByName("pid"))
     
-    if err != nil {
-        w.Header().Add("Content-Type", "application/json")
-        w.WriteHeader(http.StatusNotFound)
-        json.NewEncoder(w).Encode(map[string]string{"error": "comment not found"})
-        return
-    }
+	if err != nil {
+		w.Header().Add("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "post not found"})
+		return
+	}
 
-    r.Body = http.MaxBytesReader(w, r.Body, 1048576)
+	cid, err := strconv.Atoi(params.ByName("cid"))
 
-    for i := range db.Comments {
-        if db.Comments[i].Id == id {
-            c = db.Comments[i]
-        }
-    }
+	if err != nil {
+		w.Header().Add("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "comment not found"})
+		return
+	}
 
-    dec := json.NewDecoder(r.Body)
-    dec.DisallowUnknownFields()
-    err = dec.Decode(&c)
+	r.Body = http.MaxBytesReader(w, r.Body, 1048576)
 
-    if err != nil || c.Id < 1 {
-        w.Header().Add("Content-Type", "application/json")
-        w.WriteHeader(http.StatusBadRequest)
-        json.NewEncoder(w).Encode(map[string]string{"error": "couldn't edit comment"})
-        return
-    }
+	for i := range db.Comments {
+		if db.Comments[i].PostId == pid && db.Comments[i].Id == cid {
+			c = db.Comments[i]
+		}
+	}
 
-    db.Comments[id-1] = c
-    w.Header().Add("Content-Type", "application/json")
-    w.WriteHeader(http.StatusOK)
-    json.NewEncoder(w).Encode(c)
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	err = dec.Decode(&c)
+
+	if err != nil || c.Id < 1 {
+		w.Header().Add("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "couldn't edit comment"})
+		return
+	}
+
+	db.Comments[cid] = c
+	w.Header().Add("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(c)
 }
