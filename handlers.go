@@ -40,6 +40,7 @@ func AddPost(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	dec.DisallowUnknownFields()
 	err := dec.Decode(&p)
 
+
 	if err != nil {
 		w.Header().Add("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
@@ -165,6 +166,13 @@ func AddComment(w http.ResponseWriter, r *http.Request, params httprouter.Params
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
 	err = dec.Decode(&c)
+    
+	if err != nil {
+		w.Header().Add("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "couldn't add comment"})
+		return
+	}
 
 	var index int = 1
 
@@ -204,7 +212,7 @@ func UpdateComment(w http.ResponseWriter, r *http.Request, params httprouter.Par
 		json.NewEncoder(w).Encode(map[string]string{"error": "comment not found"})
 		return
 	}
-
+    
 	r.Body = http.MaxBytesReader(w, r.Body, 1048576)
 
 	for i := range db.Comments {
@@ -213,18 +221,33 @@ func UpdateComment(w http.ResponseWriter, r *http.Request, params httprouter.Par
 		}
 	}
 
+	if c.Id == 0 {
+		w.Header().Add("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "comment not found"})
+		return
+	}
+
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
 	err = dec.Decode(&c)
-
-	if err != nil || c.Id < 1 {
+    
+	if err != nil {
 		w.Header().Add("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]string{"error": "couldn't edit comment"})
 		return
 	}
 
-	db.Comments[cid] = c
+	var index int = 1
+
+	if len(db.Comments) == 0 {
+		index = 1
+	} else {
+        index = cid - 1 
+    }
+
+	db.Comments[index] = c
 	w.Header().Add("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(c)
