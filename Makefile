@@ -21,7 +21,7 @@ test: # Run all test suites
 	@sudo docker exec ${APP_NAME} go test -v ./...
 
 coverage: # Run tests coverage
-	@sudo docker exec ${APP_NAME} mkdir ./out
+	@sudo docker exec ${APP_NAME} mkdir -p ./out
 	@sudo docker exec ${APP_NAME} go test -cover -covermode=count -coverprofile=./out/coverage.out ./...
 	@sudo docker exec ${APP_NAME} go tool cover -func ./out/coverage.out 
 	@sudo docker exec ${APP_NAME} go tool cover -html=./out/coverage.out -o ./out/coverage.html
