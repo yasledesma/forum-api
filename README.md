@@ -18,3 +18,22 @@ For building and/or running a binary outside the container, you can use `make bu
 
 Commands that are not part of the Makefile can be run by spinning up a terminal inside the container with `make term`.
 
+### Testing
+All test suites can be run at the same time with:
+
+```
+make test
+```
+
+You can generate coverage reports by running:
+
+```
+make coverage
+```
+
+Also, if you want to run an specifict test suite or test, you can spin-up a terminal inside the container and run:
+
+```
+go test -v -run <test_suite>/<test>
+```
+
