@@ -18,8 +18,8 @@ jobs:
         run: |
           go mod download
           go mod verify
-          
-      - name: Run and upload test results
+
+      - name: Run test coverage
         env:
           TAG: ${GITHUB_REF#refs/*/}
         run: |
@@ -27,11 +27,13 @@ jobs:
           go test -cover -covermode=count -coverprofile=./out/coverage-$TAG.out ./...
           go tool cover -func ./out/coverage-$TAG.out
           go tool cover -html=./out/coverage-$TAG.out -o ./out/coverage-$TAG.html
+        continue-on-error: false
+          
+      - name: Upload test results
         uses: actions/upload-artifact@v4
         with:
           name: results
           path: ./out/*
-        continue-on-error: false
         if-no-files-found: error
 
       - name: Deploy
@@ -47,3 +49,4 @@ jobs:
               --repo="$GITHUB_REPOSITORY" \
               --title="${TAG#v}" \
               --generate-notes
+              
