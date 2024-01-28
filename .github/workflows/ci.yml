@@ -1,0 +1,49 @@
+name: Deploy new version on Render
+
+on: 
+  push:
+    branches: 
+      - 'main'
+    tags:
+      - 'v[\d]+\.[\d]+\.[\d]+*'
+      
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go-version: [ '1.21.x' ]
+    steps:
+      - name: Install dependencies
+        run: |
+          go mod download
+          go mod verify
+          
+      - name: Run and upload test results
+        env:
+          TAG: ${GITHUB_REF#refs/*/}
+        run: |
+          mkdir -p ./out
+          go test -cover -covermode=count -coverprofile=./out/coverage-$TAG.out ./...
+          go tool cover -func ./out/coverage-$TAG.out
+          go tool cover -html=./out/coverage-$TAG.out -o ./out/coverage-$TAG.html
+        uses: actions/upload-artifact@v4
+        with:
+          name: results
+          path: ./out/*
+        continue-on-error: false
+        if-no-files-found: error
+
+      - name: Deploy
+        run: |
+          curl secrets.RENDER_DEPLOY_HOOK_URL
+
+      - name: Create release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG" \
+              --repo="$GITHUB_REPOSITORY" \
+              --title="${TAG#v}" \
+              --generate-notes
