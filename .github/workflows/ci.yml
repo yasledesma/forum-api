@@ -12,8 +12,8 @@ jobs:
       matrix:
         go-version: [ '1.21.x' ]
     steps:
-      - name: Exit if not on master branch
-        if: endsWith(github.ref, 'master') == false
+      - name: Exit if not on main branch
+        if: endsWith(github.ref, 'main') == false
         run: exit -1
           
       - name: Install dependencies
