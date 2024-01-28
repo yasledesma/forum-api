@@ -36,7 +36,6 @@ jobs:
         with:
           name: results
           path: ./out/*
-        if-no-files-found: error
 
       - name: Deploy
         run: |
