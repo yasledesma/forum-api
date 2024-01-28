@@ -13,7 +13,7 @@ jobs:
         go-version: [ '1.21.x' ]
     steps:
       - name: Exit if not on main branch
-        if: ${{ ! endsWith(${GITHUB_WORKFLOW_REF}, 'main') }}
+        if: ${{ ! endsWith($GITHUB_WORKFLOW_REF, 'main') }}
         run: exit -1
           
       - name: Install dependencies
