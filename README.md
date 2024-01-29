@@ -18,6 +18,7 @@ For building and/or running a binary outside the container, you can use `make bu
 
 Commands that are not part of the Makefile can be run by spinning up a terminal inside the container with `make term`.
 
+## Usage
 ### Testing
 All test suites can be run at the same time with:
 
@@ -36,4 +37,13 @@ Also, if you want to run an specifict test suite or test, you can spin-up a term
 ```
 go test -v -run <test_suite>/<test>
 ```
+
+### Deployment
+To trigger the deployment pipeline, you need to create and push a new tag with the format:
+
+```
+v*.*.*
+```
+
+This will call the Render hook and create a new release with auto-generated notes.
 
